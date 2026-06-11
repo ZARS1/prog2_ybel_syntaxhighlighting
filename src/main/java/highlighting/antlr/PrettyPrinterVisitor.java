@@ -1,6 +1,7 @@
 package highlighting.antlr;
 
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 /// MiniJava Pretty Printer (minimal, stateful)
@@ -35,51 +36,100 @@ public final class PrettyPrinterVisitor extends MiniJavaBaseVisitor<Void> {
 
   // ----------------------------------------------------
   // Structural methods – these enforce indentation and "one statement per line"
-  //
-  // TODO: implement the four structural visitXyz-methods below: visitCompilationUnit,
-  // visitClassBody, visitBlock, and visitStatement
   // ----------------------------------------------------
 
   @Override
   public Void visitCompilationUnit(MiniJavaParser.CompilationUnitContext ctx) {
-    // TODO:
-    // Produce a nicely structured compilation unit:
-    // - package declaration (if present),
-    // - import declarations (one per line),
-    // - type declarations (one after another),
-    // with sensible blank lines between these parts.
+    for (int i = 0; i < ctx.getChildCount(); i++) {
+      ParseTree child = ctx.getChild(i);
+
+      if (isTerminalText(child, "<EOF>")) {
+        continue;
+      }
+
+      visit(child);
+
+      if (!atLineStart) {
+        nl();
+      }
+    }
+
     return null;
   }
 
   @Override
   public Void visitClassBody(MiniJavaParser.ClassBodyContext ctx) {
-    // TODO:
-    // Format the contents of a class body:
-    // - opening and closing brace,
-    // - one member declaration per line,
-    // - members indented relative to the class.
+    write(" {");
+    nl();
+
+    currentIndent++;
+
+    for (int i = 0; i < ctx.getChildCount(); i++) {
+      ParseTree child = ctx.getChild(i);
+
+      if (isTerminalText(child, "{") || isTerminalText(child, "}")) {
+        continue;
+      }
+
+      visit(child);
+
+      if (!atLineStart) {
+        nl();
+      }
+    }
+
+    currentIndent--;
+
+    write("}");
+    nl();
+
     return null;
   }
 
   @Override
   public Void visitBlock(MiniJavaParser.BlockContext ctx) {
-    // TODO:
-    // Format a block:
-    // - opening and closing brace,
-    // - one blockStatement per line,
-    // - nested blocks indented further.
+    write(" {");
+    nl();
+
+    currentIndent++;
+
+    for (int i = 0; i < ctx.getChildCount(); i++) {
+      ParseTree child = ctx.getChild(i);
+
+      if (isTerminalText(child, "{") || isTerminalText(child, "}")) {
+        continue;
+      }
+
+      visit(child);
+
+      if (!atLineStart) {
+        nl();
+      }
+    }
+
+    currentIndent--;
+
+    write("}");
+
     return null;
   }
 
   @Override
   public Void visitStatement(MiniJavaParser.StatementContext ctx) {
-    // TODO:
-    // Ensure that each statement (if/while/return/block/...) ends up
-    // on exactly one line, with proper indentation for nested statements.
+    visitChildren(ctx);
+
+    if (!atLineStart) {
+      nl();
+    }
+
     return null;
   }
 
   // ---------------- helper methods ----------------
+
+  private boolean isTerminalText(ParseTree child, String text) {
+    return child instanceof TerminalNode terminalNode && text.equals(terminalNode.getText());
+  }
 
   private void indent() {
     if (atLineStart) {
@@ -111,6 +161,10 @@ public final class PrettyPrinterVisitor extends MiniJavaBaseVisitor<Void> {
   public Void visitTerminal(TerminalNode node) {
     Token t = node.getSymbol();
     String text = t.getText();
+
+    if ("<EOF>".equals(text)) {
+      return null;
+    }
 
     if (lastToken != null) {
       int prevType = lastToken.getType();
